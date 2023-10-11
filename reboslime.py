@@ -85,6 +85,11 @@ def tracker_handler(unused_addr, number, a2, a3, a4, a5, a6, qx, qy, qz, qw):
   except ValueError: pass
 
 # Main
+print("关于节点数目的使用说明：\n\
+·  8 点：胸 + 腰 + 大腿 + 小腿 + 脚 \n\
+· 10 点：胸 + 腰 + 大腿 + 小腿 + 脚 + 大臂 \n\
+· 12 点：胸 + 腰 + 大腿 + 小腿 + 脚 + 大臂 + 小臂 \n\
+· 15 点：全身")
 REBOCAP_COUNT = input("想要以几点动捕的形式运行呢？（请输入 8 / 10 / 12 / 15）:")
 
 parser = argparse.ArgumentParser()
