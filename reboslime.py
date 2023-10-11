@@ -10,15 +10,11 @@ from pythonosc.dispatcher import Dispatcher
 from pythonosc import osc_server
 
 CONFIG = json.load(open('config.json'))
+VERSION = CONFIG['version']
 REBOCAP_COUNT = CONFIG['rebocap_count']
 SLIME_IP = CONFIG['slime_ip']  # SlimeVR Server
 SLIME_PORT = CONFIG['slime_port']  # SlimeVR Server
 TPS = CONFIG['tps']  # SlimeVR packet frequency. Keep below 300 (above 300 has weird behavior)
-
-sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-ZERO_QUAT = [1, 0, 0, 0]
-ALL_CONNECTED = False
-PACKET_COUNTER = 0
 
 
 def build_handshake():
@@ -45,6 +41,7 @@ def add_imu(trackerID):
     buffer += struct.pack('B', 0) #sensor status
     buffer += struct.pack('B', 0) #sensor type
     sock.sendto(buffer, (SLIME_IP, SLIME_PORT))
+    # print("Add IMU: " + str(trackerID))
     PACKET_COUNTER += 1
 
 
@@ -59,12 +56,10 @@ def build_rotation_packet(qw: float, qx: float, qy: float, qz: float, tracker_id
     return buffer
 
 
-def sendCommand(tId, cmd):  # id: Tracker ID / cmd: Command to send
-    if cmd == "start":  # Start tracker data stream
-        globals()['cmd_ch_t' + str(tId)].write(bytearray(b'\x7e\x03\x18\xd6\x01\x00\x00'), True)
-    else:
-        print("Invalid command")
-
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+ZERO_QUAT = [1, 0, 0, 0]
+ALL_CONNECTED = False
+PACKET_COUNTER = 0
 
 def sendAllIMUs(mac_addrs):  # mac_addrs: Table of mac addresses. Just used to get number of trackers
     global TPS, PACKET_COUNTER
@@ -79,20 +74,19 @@ def sendAllIMUs(mac_addrs):  # mac_addrs: Table of mac addresses. Just used to g
                 #accel = build_accel_packet(sensor.ax, sensor.ay, sensor.az, i)
                 #sock.sendto(accel, (SLIME_IP, SLIME_PORT))
                 #PACKET_COUNTER += 1
-            time.sleep(1 / TPS)
+            #time.sleep(1 / TPS)
 
-
-def print_tracker_handler(unused_addr, a0, number, a2, a3, a4, a5, a6, qx, qy, qz, qw):
+def tracker_handler(unused_addr, number, a2, a3, a4, a5, a6, qx, qy, qz, qw):
   global TPS, PACKET_COUNTER
   try:
     rot = build_rotation_packet(qw, qx, qy, qz, number)
     sock.sendto(rot, (SLIME_IP, SLIME_PORT))
     PACKET_COUNTER += 1
-    # time.sleep(1 / TPS)
   except ValueError: pass
 
-
 # Main
+REBOCAP_COUNT = input("想要以几点动捕的形式运行呢？（请输入 8 / 10 / 12 / 15）:")
+
 parser = argparse.ArgumentParser()
 parser.add_argument("--ip",
     default="127.0.0.1", help="The ip to listen on")
@@ -100,7 +94,7 @@ parser.add_argument("--port",
     type=int, default=39570, help="The port to listen on")
 args = parser.parse_args()
 dispatcher = Dispatcher()
-dispatcher.map("/VMT/Room/Driver", print_tracker_handler, "Tracker")
+dispatcher.map("/VMT/Room/Driver", tracker_handler)
 
 server = osc_server.ThreadingOSCUDPServer(
     (args.ip, args.port), dispatcher)
@@ -109,15 +103,34 @@ server = osc_server.ThreadingOSCUDPServer(
 handshake = build_handshake()
 sock.sendto(handshake, (SLIME_IP, SLIME_PORT))
 PACKET_COUNTER += 1
-print("Handshake")
+print("Handshake with SlimeVR Server Successful!")
 time.sleep(.1)
 
 # Add additional IMUs. SlimeVR only supports one "real" tracker per IP so the workaround is to make all the
 # trackers appear as extensions of the first tracker.
-for i in range(REBOCAP_COUNT):
-    for z in range(3): # slimevr has been missing "add IMU" packets so we just send em 3 times to make sure they get thru
-        add_imu(i)
-    print("Tracker Added: " + str(i))
+if int(REBOCAP_COUNT) == 8:
+    for i in range(int(REBOCAP_COUNT)):
+        for z in range(3): # slimevr has been missing "add IMU" packets so we just send em 3 times to make sure they get thru
+            add_imu(i)
+        print("Add IMU: " + str(i))
+elif int(REBOCAP_COUNT) == 10:
+    for i in [0, 1, 2, 3, 4, 5, 6, 7, 9, 10]:
+        for z in range(3): # slimevr has been missing "add IMU" packets so we just send em 3 times to make sure they get thru
+            add_imu(i)
+        print("Add IMU: " + str(i))
+elif int(REBOCAP_COUNT) == 12:
+    for i in [0, 1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12]:
+        for z in range(3): # slimevr has been missing "add IMU" packets so we just send em 3 times to make sure they get thru
+            add_imu(i)
+        print("Add IMU: " + str(i))
+elif int(REBOCAP_COUNT) == 15:
+    for i in range(int(REBOCAP_COUNT)):
+        for z in range(3): # slimevr has been missing "add IMU" packets so we just send em 3 times to make sure they get thru
+            add_imu(i)
+        print("Add IMU: " + str(i))
+else:
+    print("目前只支持 8 / 10 / 12 / 15 点哦！")
+    exit()
 
 time.sleep(.5)
 ALL_CONNECTED = True
