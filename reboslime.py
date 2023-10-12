@@ -8,6 +8,7 @@ import os
 import argparse
 from pythonosc.dispatcher import Dispatcher
 from pythonosc import osc_server
+from libs.inputimeout import inputimeout, TimeoutOccurred
 
 CONFIG = json.load(open('config.json'))
 VERSION = CONFIG['version']
@@ -90,7 +91,11 @@ print("关于节点数目的使用说明：\n\
 · 10 点：胸 + 腰 + 大腿 + 小腿 + 脚 + 大臂 \n\
 · 12 点：胸 + 腰 + 大腿 + 小腿 + 脚 + 大臂 + 小臂 \n\
 · 15 点：全身")
-REBOCAP_COUNT = input("想要以几点动捕的形式运行呢？（请输入 8 / 10 / 12 / 15）:")
+# REBOCAP_COUNT = input("想要以几点动捕的形式运行呢？（请输入 8 / 10 / 12 / 15）:")
+try:
+    REBOCAP_COUNT = inputimeout("想要以几点动捕的形式运行呢？如无输入，将在 10 秒后以 8 点模式运行（请输入 8 / 10 / 12 / 15）:", 10)
+except TimeoutOccurred:
+    REBOCAP_COUNT = 8
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--ip",
