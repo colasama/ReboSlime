@@ -3,10 +3,10 @@
 
 ## 使用说明
 
-- 首先安装 Python 及其依赖 `pip install python-osc`
+- 首先安装 Python 及其依赖 `pip install python-osc`，或者直接下载 `release` 中的可执行文件。
 - 开启 SlimeVR Server 中 OSC 路由功能，并将输入端口设置为 `39570`，输出端口设置为 `39571`。
 - 打开 ReboCap 客户端，点击 **动作校准1** 然后点击 VR 校准。
-- 运行 `run.bat`。
+- 运行 `run.bat` 或者 `reboslime.exe`。
 - 现在应该能在 SlimeVR 中看到追踪器了！之后按照 SlimeVR 的用法来就可以了。
 
 ## 注意事项
