@@ -1,21 +1,64 @@
-#!/usr/bin/python3
 import json
 import socket
 import time
 import struct
-import threading
-import os
 import argparse
 from pythonosc.dispatcher import Dispatcher
 from pythonosc import osc_server
 from libs.inputimeout import inputimeout, TimeoutOccurred
+from libs.rebocap import rebocap_ws_sdk
+from rich.console import Console
+
 
 CONFIG = json.load(open('config.json'))
 VERSION = CONFIG['version']
-REBOCAP_COUNT = CONFIG['rebocap_count']
+REBOCAP_COUNT = 8
 SLIME_IP = CONFIG['slime_ip']  # SlimeVR Server
 SLIME_PORT = CONFIG['slime_port']  # SlimeVR Server
 TPS = CONFIG['tps']  # SlimeVR packet frequency. Keep below 300 (above 300 has weird behavior)
+ZERO_QUAT = [1, 0, 0, 0]
+ALL_CONNECTED = False
+PACKET_COUNTER = 0
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+sdk = rebocap_ws_sdk.RebocapWsSdk(rebocap_ws_sdk.CoordinateType.UECoordinate)
+
+# 姿态数据回调
+def pose_msg_callback(self: rebocap_ws_sdk.RebocapWsSdk, tran: list, pose24: list, static_index: int, ts: float):
+    for i in range(24):
+        update_imu_quat(i, pose24[i][0], pose24[i][1], pose24[i][2], pose24[i][3])
+        # console.log(rebocap_ws_sdk.REBOCAP_JOINT_NAMES[i], ["%.5f" % num for num in pose24[i]])
+        # time.sleep(0.1)
+
+
+# 异常断开，这里处理重连或报错
+def exception_close_callback(self: rebocap_ws_sdk.RebocapWsSdk):
+    print("exception_close_callback")
+
+
+def init_rebocap_ws():
+    global sdk
+    # 初始化sdk
+    # sdk = rebocap_ws_sdk.RebocapWsSdk(rebocap_ws_sdk.CoordinateType.UECoordinate)
+    # 设置姿态回调
+    sdk.set_pose_msg_callback(pose_msg_callback)
+    # 设置异常断开回调
+    sdk.set_exception_close_callback(exception_close_callback)
+    # 开始连接
+    open_ret = sdk.open(7690)
+    # 检查连接状态
+    if open_ret == 0:
+        console.print("Rebocap 客户端连接成功！")
+    else:
+        console.print("Rebocap 客户端连接失败！", open_ret)
+        if open_ret == 1:
+            console.print("Rebocap 客户端连接状态错误！")
+        elif open_ret == 2:
+            console.print("Rebocap 客户端连接失败！")
+        elif open_ret == 3:
+            console.print("Rebocap 客户端认证失败！")
+        else:
+            console.print("未知错误！代码：", open_ret)
+        exit(1)
 
 
 def build_handshake():
@@ -34,11 +77,11 @@ def build_handshake():
     return buffer
 
 
-def add_imu(trackerID):
+def add_imu(id):
     global PACKET_COUNTER
     buffer = b'\x00\x00\x00\x0f'  # packet 15 header
     buffer += struct.pack('>Q', PACKET_COUNTER) #packet counter
-    buffer += struct.pack('B', trackerID) #tracker id (shown as IMU Tracker #x in SlimeVR)
+    buffer += struct.pack('B', id) #tracker id (shown as IMU Tracker #x in SlimeVR)
     buffer += struct.pack('B', 0) #sensor status
     buffer += struct.pack('B', 0) #sensor type
     sock.sendto(buffer, (SLIME_IP, SLIME_PORT))
@@ -57,12 +100,7 @@ def build_rotation_packet(qw: float, qx: float, qy: float, qz: float, tracker_id
     return buffer
 
 
-sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-ZERO_QUAT = [1, 0, 0, 0]
-ALL_CONNECTED = False
-PACKET_COUNTER = 0
-
-def sendAllIMUs(mac_addrs):  # mac_addrs: Table of mac addresses. Just used to get number of trackers
+def send_all_imus(mac_addrs):  # mac_addrs: Table of mac addresses. Just used to get number of trackers
     global TPS, PACKET_COUNTER
     while True:
         for z in range(TPS):
@@ -77,76 +115,71 @@ def sendAllIMUs(mac_addrs):  # mac_addrs: Table of mac addresses. Just used to g
                 #PACKET_COUNTER += 1
             #time.sleep(1 / TPS)
 
-def tracker_handler(unused_addr, number, a2, a3, a4, a5, a6, qx, qy, qz, qw):
+def update_imu_quat(id, qx, qy, qz, qw):
   global TPS, PACKET_COUNTER
   try:
-    rot = build_rotation_packet(qw, qx, qy, qz, number)
+    rot = build_rotation_packet(qw, qx, qy, qz, id)
     sock.sendto(rot, (SLIME_IP, SLIME_PORT))
     PACKET_COUNTER += 1
   except ValueError: pass
 
 # Main
-print("关于节点数目的使用说明：\n\
+console = Console()
+console.print(" ___       _          ___  _  _             \n\
+| _ \ ___ | |__  ___ / __|| |(_) _ __   ___ \n\
+|   // -_)|  _ \/ _ \\\__ \| || || '  \ / -_)\n\
+|_|_\\\___||____/\___/|___/|_||_||_|_|_|\___|  v" + VERSION + "\n\
+")
+console.print("关于节点数目的使用说明：\n\
 ·  8 点：胸 + 腰 + 大腿 + 小腿 + 脚 \n\
 · 10 点：胸 + 腰 + 大腿 + 小腿 + 脚 + 大臂 \n\
 · 12 点：胸 + 腰 + 大腿 + 小腿 + 脚 + 大臂 + 小臂 \n\
-· 15 点：全身")
+· 15 点：全身\n")
 # REBOCAP_COUNT = input("想要以几点动捕的形式运行呢？（请输入 8 / 10 / 12 / 15）:")
 try:
     REBOCAP_COUNT = inputimeout("想要以几点动捕的形式运行呢？如无输入，将在 10 秒后以 8 点模式运行（请输入 8 / 10 / 12 / 15）:", 10)
 except TimeoutOccurred:
     REBOCAP_COUNT = 8
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--ip",
-    default="127.0.0.1", help="The ip to listen on")
-parser.add_argument("--port",
-    type=int, default=39570, help="The port to listen on")
-args = parser.parse_args()
-dispatcher = Dispatcher()
-dispatcher.map("/VMT/Room/Driver", tracker_handler)
-
-server = osc_server.ThreadingOSCUDPServer(
-    (args.ip, args.port), dispatcher)
+# 连接 Rebocap
+init_rebocap_ws()
 
 # Connected To SlimeVR Server
 handshake = build_handshake()
 sock.sendto(handshake, (SLIME_IP, SLIME_PORT))
 PACKET_COUNTER += 1
-print("Handshake with SlimeVR Server Successful!")
-time.sleep(.1)
+console.print("成功连接到 SlimeVR 服务器!")
+time.sleep(0.1)
 
 # Add additional IMUs. SlimeVR only supports one "real" tracker per IP so the workaround is to make all the
 # trackers appear as extensions of the first tracker.
 if int(REBOCAP_COUNT) == 8:
-    for i in range(int(REBOCAP_COUNT)):
+    for i in [9, 3, 0, 4, 5, 7, 8, 10, 11]:
         for z in range(3): # slimevr has been missing "add IMU" packets so we just send em 3 times to make sure they get thru
             add_imu(i)
-        print("Add IMU: " + str(i))
+        console.print("Add IMU: " + str(i))
 elif int(REBOCAP_COUNT) == 10:
-    for i in [0, 1, 2, 3, 4, 5, 6, 7, 9, 10]:
+    for i in [9, 3, 0, 1, 2, 4, 5, 7, 8, 10, 11]:
         for z in range(3): # slimevr has been missing "add IMU" packets so we just send em 3 times to make sure they get thru
             add_imu(i)
-        print("Add IMU: " + str(i))
+        console.print("Add IMU: " + str(i))
 elif int(REBOCAP_COUNT) == 12:
-    for i in [0, 1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12]:
+    for i in [9, 0, 1, 2, 4, 5, 7, 8, 10, 11, 18, 19]:
         for z in range(3): # slimevr has been missing "add IMU" packets so we just send em 3 times to make sure they get thru
             add_imu(i)
-        print("Add IMU: " + str(i))
+        console.print("Add IMU: " + str(i))
 elif int(REBOCAP_COUNT) == 15:
-    for i in range(int(REBOCAP_COUNT)):
+    for i in [9, 0, 1, 2, 4, 5, 7, 8, 10, 11, 18, 19, 22, 23 ,15]:
         for z in range(3): # slimevr has been missing "add IMU" packets so we just send em 3 times to make sure they get thru
             add_imu(i)
-        print("Add IMU: " + str(i))
+        console.print("Add IMU: " + str(i))
 else:
-    print("目前只支持 8 / 10 / 12 / 15 点哦！")
+    console.print("目前只支持 8 / 10 / 12 / 15 点哦！")
     exit()
 
 time.sleep(.5)
 ALL_CONNECTED = True
 
-print("Serving on {}".format(server.server_address))
-print("Safe to start tracking. To stop ReboSlime, press Ctrl-C multiple times.")
-
-server.serve_forever()
-
+console.print("已开启追踪！如果想要停止 ReboSlime, 多按几次 Ctrl-C 即可。")
+time.sleep(1000)
+sdk.close()
