@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "reboslime"
+version = "0.1.0"
+description = ""
+authors = ["Colanns <mycolands@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "3.10.10"
+python-osc = "^1.8.3"
+rich = "^13.7.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

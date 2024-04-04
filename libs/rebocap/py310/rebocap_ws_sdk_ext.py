@@ -1,4 +1,4 @@
-def rebocap_ws_sdk_new(self, pose_msg_callback, exception_close_callback, coordinate_type):
+def rebocap_ws_sdk_new(self, pose_msg_callback, exception_close_callback, coordinate_type, global_quat):
     pass
 
 

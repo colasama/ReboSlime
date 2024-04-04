@@ -2,6 +2,8 @@
 
 # current support python version
 - python3.7
+- python3.8
+- python3.10
 
 # example
 直接运行 `python reborncap_ws_sdk_example.py`
@@ -16,8 +18,8 @@ def pose_msg_callback(self: rebocap_ws_sdk.RebocapWsSdk, tran: list, pose24: lis
 def exception_close_callback(self: rebocap_ws_sdk.RebocapWsSdk):
     print("exception_close_callback")
 
-# 初始化sdk  这里可以选择坐标类型
-sdk = rebocap_ws_sdk.RebocapWsSdk(rebocap_ws_sdk.CoordinateType.UECoordinate)
+# 初始化sdk  这里可以选择坐标空间 以及 坐标输出【全局 or 局部】
+sdk = rebocap_ws_sdk.RebocapWsSdk(rebocap_ws_sdk.CoordinateType.UECoordinate, use_global_rotation=True)
 # 设置姿态回调
 sdk.set_pose_msg_callback(pose_msg_callback)
 # 设置异常断开回调

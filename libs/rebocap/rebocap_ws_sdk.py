@@ -1,7 +1,17 @@
 import random
 import enum
+import sys
 
-from libs.rebocap import rebocap_ws_sdk_ext
+py_version = sys.version
+if py_version.startswith('3.7'):
+    from libs.rebocap.py37 import rebocap_ws_sdk_ext
+elif py_version.startswith('3.8'):
+    from libs.rebocap.py38 import rebocap_ws_sdk_ext
+elif py_version.startswith('3.10'):
+    from libs.rebocap.py310 import rebocap_ws_sdk_ext
+else:
+    raise 'not support python version!!!! current support is: python 3.7; python 3.8; python 3.10'
+
 
 REBOCAP_JOINT_NAMES = [
     "Pelvis",
@@ -40,13 +50,14 @@ class CoordinateType(enum.Enum):
 
 
 class RebocapWsSdk:
-    def __init__(self, coordinate_type: CoordinateType = CoordinateType.DefaultCoordinate):
+    def __init__(self, coordinate_type: CoordinateType = CoordinateType.DefaultCoordinate, use_global_rotation=False):
         self.pose_msg_callback_f = None
         self.exception_close_callback_f = None
         self.coordinate_type: CoordinateType = coordinate_type
         self.handle = rebocap_ws_sdk_ext.rebocap_ws_sdk_new(self, RebocapWsSdk.pose_msg_callback,
                                                             RebocapWsSdk.exception_close_callback,
-                                                            coordinate_type.value)
+                                                            coordinate_type.value, 1 if use_global_rotation else 0)
+        pass
 
     def __del__(self):
         rebocap_ws_sdk_ext.rebocap_ws_sdk_release(self.handle)
@@ -57,7 +68,7 @@ class RebocapWsSdk:
     回调函数参数:
     - self: RebocapWsSdk
     - tran: float [3]
-    - pose24: float [24,3]
+    - pose24: float [24,4]
     - static_index: int
     - ts: float 秒时间戳
     '''
@@ -101,7 +112,7 @@ class RebocapWsSdk:
     姿态数据回调
     参数
     - tran: [3]
-    - pose24: [24,3]
+    - pose24: [24,4]
     - static_index: int
     - tp: 毫秒时间戳
     '''
@@ -122,7 +133,7 @@ class RebocapWsSdk:
     获取最近一帧的数据
     返回值 tuple(4)
     - tran: [3]
-    - pose24: [24,3]
+    - pose24: [24,4]
     - static_index: int
     - tp: 毫秒时间戳
     '''

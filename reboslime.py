@@ -2,9 +2,6 @@ import json
 import socket
 import time
 import struct
-import argparse
-from pythonosc.dispatcher import Dispatcher
-from pythonosc import osc_server
 from libs.inputimeout import inputimeout, TimeoutOccurred
 from libs.rebocap import rebocap_ws_sdk
 from rich.console import Console
@@ -95,7 +92,7 @@ def build_rotation_packet(qw: float, qx: float, qy: float, qz: float, tracker_id
     buffer += struct.pack('>Q', PACKET_COUNTER) #packet counter
     buffer += struct.pack('B', tracker_id) #tracker id (shown as IMU Tracker #x in SlimeVR)
     buffer += struct.pack('B', 1) # data type (use is unknown)
-    buffer += struct.pack('>ffff', -qx, qz, qy, qw)  # quaternion as x,z,y,w
+    buffer += struct.pack('>ffff', qx, -qz, qy, qw)  # quaternion as x,z,y,w
     buffer += struct.pack('B', 0) # calibration info (seems to not be used by SlimeVR currently)
     return buffer
 
@@ -131,13 +128,14 @@ console.print(" ___       _          ___  _  _             \n\
 |_|_\\\___||____/\___/|___/|_||_||_|_|_|\___|  v" + VERSION + "\n\
 ")
 console.print("关于节点数目的使用说明：\n\
-·  8 点：胸 + 腰 + 大腿 + 小腿 + 脚 \n\
+· 6  点：胸部 + 髋部 + 大腿 + 小腿 \n\
+· 8  点：胸 + 腰 + 大腿 + 小腿 + 脚 \n\
 · 10 点：胸 + 腰 + 大腿 + 小腿 + 脚 + 大臂 \n\
 · 12 点：胸 + 腰 + 大腿 + 小腿 + 脚 + 大臂 + 小臂 \n\
 · 15 点：全身\n")
-# REBOCAP_COUNT = input("想要以几点动捕的形式运行呢？（请输入 8 / 10 / 12 / 15）:")
+
 try:
-    REBOCAP_COUNT = inputimeout("想要以几点动捕的形式运行呢？如无输入，将在 10 秒后以 8 点模式运行（请输入 8 / 10 / 12 / 15）:", 10)
+    REBOCAP_COUNT = inputimeout("想要以几点动捕的形式运行呢？如无输入，将在 10 秒后以 8 点模式运行（请输入 6 / 8 / 10 / 12 / 15）: ", 10)
 except TimeoutOccurred:
     REBOCAP_COUNT = 8
 
@@ -153,7 +151,12 @@ time.sleep(0.1)
 
 # Add additional IMUs. SlimeVR only supports one "real" tracker per IP so the workaround is to make all the
 # trackers appear as extensions of the first tracker.
-if int(REBOCAP_COUNT) == 8:
+if int(REBOCAP_COUNT) == 6:
+    for i in [6, 0, 4, 5, 7, 8]:
+        for z in range(3): # slimevr has been missing "add IMU" packets so we just send em 3 times to make sure they get thru
+            add_imu(i)
+        console.print("Add IMU: " + str(i))
+elif int(REBOCAP_COUNT) == 8:
     for i in [9, 3, 0, 4, 5, 7, 8, 10, 11]:
         for z in range(3): # slimevr has been missing "add IMU" packets so we just send em 3 times to make sure they get thru
             add_imu(i)
@@ -174,7 +177,7 @@ elif int(REBOCAP_COUNT) == 15:
             add_imu(i)
         console.print("Add IMU: " + str(i))
 else:
-    console.print("目前只支持 8 / 10 / 12 / 15 点哦！")
+    console.print("目前只支持 6 / 8 / 10 / 12 / 15 点哦！")
     exit()
 
 time.sleep(.5)

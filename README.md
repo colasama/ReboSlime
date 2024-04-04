@@ -1,13 +1,21 @@
 # ReboSlime
-> 在 SlimeVR Server 中使用 ReboCap，基于 OSC 协议。 | Use ReboCap in SlimeVR Server based on Open Sound Control protocol.
+> 在 SlimeVR Server 中使用 ReboCap，基于 OSC 协议。
+>
+> Use ReboCap in SlimeVR Server based on Open Sound Control protocol.
 
 ## 使用说明
 
-- 首先安装 Python 及其依赖 `pip install python-osc`，或者直接下载 `release` 中的可执行文件。
+- 下载 `Releases` 中的可执行文件，最新 `v0.4.0` 已适配 Rebocap v40 及以后的版本，如果想要使用之前与 VMT 相配合的程序，请下载 `v0.31` 版本。
+
 - 开启 SlimeVR Server 中 OSC 路由功能，并将输入端口设置为 `39570`，输出端口设置为 `39571`。
 - 打开 ReboCap 客户端，点击 **动作校准1** 然后点击 VR 校准。
 - 运行 `run.bat` 或者 `reboslime.exe`。
 - 现在应该能在 SlimeVR 中看到追踪器了！之后按照 SlimeVR 的用法来就可以了。
+
+## 开发相关
+
+- 本项目使用 `Poetry` 进行依赖管理，请安装 3.10.x 版本的 Python 后运行 `pip install poetry`。
+- 使用 `poetry install` 安装依赖，然后运行 `poetry run python reboslime.py` 即可运行程序。
 
 ## 注意事项
 
