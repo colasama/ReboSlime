@@ -1,1 +1,1 @@
-python .\reboslime.py
+poetry run python .\reboslime.py
