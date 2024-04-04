@@ -2,6 +2,7 @@ import json
 import socket
 import time
 import struct
+import signal
 from libs.inputimeout import inputimeout, TimeoutOccurred
 from libs.rebocap import rebocap_ws_sdk
 from rich.console import Console
@@ -12,7 +13,8 @@ VERSION = CONFIG['version']
 REBOCAP_COUNT = 8
 SLIME_IP = CONFIG['slime_ip']  # SlimeVR Server
 SLIME_PORT = CONFIG['slime_port']  # SlimeVR Server
-TPS = CONFIG['tps']  # SlimeVR packet frequency. Keep below 300 (above 300 has weird behavior)
+# SlimeVR packet frequency. Keep below 300 (above 300 has weird behavior)
+TPS = CONFIG['tps']
 ZERO_QUAT = [1, 0, 0, 0]
 ALL_CONNECTED = False
 PACKET_COUNTER = 0
@@ -20,11 +22,17 @@ sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sdk = rebocap_ws_sdk.RebocapWsSdk(rebocap_ws_sdk.CoordinateType.UECoordinate)
 
 # 姿态数据回调
+
+
 def pose_msg_callback(self: rebocap_ws_sdk.RebocapWsSdk, tran: list, pose24: list, static_index: int, ts: float):
     for i in range(24):
-        update_imu_quat(i, pose24[i][0], pose24[i][1], pose24[i][2], pose24[i][3])
-        # console.log(rebocap_ws_sdk.REBOCAP_JOINT_NAMES[i], ["%.5f" % num for num in pose24[i]])
-        # time.sleep(0.1)
+        if i in CONFIG["imus"][str(REBOCAP_COUNT)]:
+            update_imu_quat(i, - pose24[i][0], pose24[i]
+                            [1], - pose24[i][2], pose24[i][3])
+            if i == 10:
+                console.log(rebocap_ws_sdk.REBOCAP_JOINT_NAMES[i], ["%.5f" % num for num in pose24[i]])
+            # console.log(rebocap_ws_sdk.REBOCAP_JOINT_NAMES[i], ["%.5f" % num for num in pose24[i]])
+            # time.sleep(0.1)
 
 
 # 异常断开，这里处理重连或报错
@@ -61,15 +69,17 @@ def init_rebocap_ws():
 def build_handshake():
     fw_string = "ReboSlime"
     buffer = b'\x00\x00\x00\x03'  # packet 3 header
-    buffer += struct.pack('>Q', PACKET_COUNTER) # packet counter
-    buffer += struct.pack('>I', 0) # board ID 
-    buffer += struct.pack('>I', 0) # IMU type
-    buffer += struct.pack('>I', 0) # MCU type
-    buffer += struct.pack('>III', 0, 0, 0) # IMU info
-    buffer += struct.pack('>I', 0) # Build
-    buffer += struct.pack('B', len(fw_string)) #length of fw string
-    buffer += struct.pack(str(len(fw_string)) + 's', fw_string.encode('UTF-8')) #fw string
-    buffer += struct.pack('6s', '111111'.encode('UTF-8')) #MAC address (just using a placeholder of 31:31:31:31:31:31 for now)
+    buffer += struct.pack('>Q', PACKET_COUNTER)  # packet counter
+    buffer += struct.pack('>I', 0)  # board ID
+    buffer += struct.pack('>I', 0)  # IMU type
+    buffer += struct.pack('>I', 0)  # MCU type
+    buffer += struct.pack('>III', 0, 0, 0)  # IMU info
+    buffer += struct.pack('>I', 0)  # Build
+    buffer += struct.pack('B', len(fw_string))  # length of fw string
+    buffer += struct.pack(str(len(fw_string)) + 's',
+                          fw_string.encode('UTF-8'))  # fw string
+    # MAC address (just using a placeholder of 31:31:31:31:31:31 for now)
+    buffer += struct.pack('6s', '111111'.encode('UTF-8'))
     buffer += struct.pack('B', 255)
     return buffer
 
@@ -77,48 +87,62 @@ def build_handshake():
 def add_imu(id):
     global PACKET_COUNTER
     buffer = b'\x00\x00\x00\x0f'  # packet 15 header
-    buffer += struct.pack('>Q', PACKET_COUNTER) #packet counter
-    buffer += struct.pack('B', id) #tracker id (shown as IMU Tracker #x in SlimeVR)
-    buffer += struct.pack('B', 0) #sensor status
-    buffer += struct.pack('B', 0) #sensor type
+    buffer += struct.pack('>Q', PACKET_COUNTER)  # packet counter
+    # tracker id (shown as IMU Tracker #x in SlimeVR)
+    buffer += struct.pack('B', id)
+    buffer += struct.pack('B', 0)  # sensor status
+    buffer += struct.pack('B', 0)  # sensor type
     sock.sendto(buffer, (SLIME_IP, SLIME_PORT))
     # print("Add IMU: " + str(trackerID))
     PACKET_COUNTER += 1
 
 
+def add_imus(ids):
+    for id in ids:
+        # slimevr has been missing "add IMU" packets so we just send em 3 times to make sure they get thru
+        for z in range(3):
+            add_imu(id)
+
+
 def build_rotation_packet(qw: float, qx: float, qy: float, qz: float, tracker_id: int):
     # qw,qx,qy,qz: parts of a quaternion / trackerID: Tracker ID
     buffer = b'\x00\x00\x00\x11'  # packet 17 header
-    buffer += struct.pack('>Q', PACKET_COUNTER) #packet counter
-    buffer += struct.pack('B', tracker_id) #tracker id (shown as IMU Tracker #x in SlimeVR)
-    buffer += struct.pack('B', 1) # data type (use is unknown)
+    buffer += struct.pack('>Q', PACKET_COUNTER)  # packet counter
+    # tracker id (shown as IMU Tracker #x in SlimeVR)
+    buffer += struct.pack('B', tracker_id)
+    buffer += struct.pack('B', 1)  # data type (use is unknown)
     buffer += struct.pack('>ffff', qx, -qz, qy, qw)  # quaternion as x,z,y,w
-    buffer += struct.pack('B', 0) # calibration info (seems to not be used by SlimeVR currently)
+    # calibration info (seems to not be used by SlimeVR currently)
+    buffer += struct.pack('B', 0)
     return buffer
 
 
-def send_all_imus(mac_addrs):  # mac_addrs: Table of mac addresses. Just used to get number of trackers
+# mac_addrs: Table of mac addresses. Just used to get number of trackers
+def send_all_imus(mac_addrs):
     global TPS, PACKET_COUNTER
     while True:
         for z in range(TPS):
             for i in range(len(mac_addrs)):
                 sensor = globals()['sensor' + str(i) + 'data']
-                rot = build_rotation_packet(sensor.qw, sensor.qx, sensor.qy, sensor.qz, i)
+                rot = build_rotation_packet(
+                    sensor.qw, sensor.qx, sensor.qy, sensor.qz, i)
                 sock.sendto(rot, (SLIME_IP, SLIME_PORT))
                 PACKET_COUNTER += 1
-                #Accel is not ready yet
-                #accel = build_accel_packet(sensor.ax, sensor.ay, sensor.az, i)
-                #sock.sendto(accel, (SLIME_IP, SLIME_PORT))
-                #PACKET_COUNTER += 1
-            #time.sleep(1 / TPS)
+                # Accel is not ready yet
+                # accel = build_accel_packet(sensor.ax, sensor.ay, sensor.az, i)
+                # sock.sendto(accel, (SLIME_IP, SLIME_PORT))
+                # PACKET_COUNTER += 1
+            # time.sleep(1 / TPS)
+
 
 def update_imu_quat(id, qx, qy, qz, qw):
-  global TPS, PACKET_COUNTER
-  try:
-    rot = build_rotation_packet(qw, qx, qy, qz, id)
-    sock.sendto(rot, (SLIME_IP, SLIME_PORT))
-    PACKET_COUNTER += 1
-  except ValueError: pass
+    global TPS, PACKET_COUNTER
+    try:
+        rot = build_rotation_packet(qw, qx, qy, qz, id)
+        sock.sendto(rot, (SLIME_IP, SLIME_PORT))
+        PACKET_COUNTER += 1
+    except ValueError:
+        pass
 
 # Main
 console = Console()
@@ -135,7 +159,8 @@ console.print("关于节点数目的使用说明：\n\
 · 15 点：全身\n")
 
 try:
-    REBOCAP_COUNT = inputimeout("想要以几点动捕的形式运行呢？如无输入，将在 10 秒后以 8 点模式运行（请输入 6 / 8 / 10 / 12 / 15）: ", 10)
+    REBOCAP_COUNT = inputimeout(
+        "想要以几点动捕的形式运行呢？如无输入，将在 10 秒后以 8 点模式运行（请输入 6 / 8 / 10 / 12 / 15）: ", 10)
 except TimeoutOccurred:
     REBOCAP_COUNT = 8
 
@@ -151,31 +176,10 @@ time.sleep(0.1)
 
 # Add additional IMUs. SlimeVR only supports one "real" tracker per IP so the workaround is to make all the
 # trackers appear as extensions of the first tracker.
-if int(REBOCAP_COUNT) == 6:
-    for i in [6, 0, 4, 5, 7, 8]:
-        for z in range(3): # slimevr has been missing "add IMU" packets so we just send em 3 times to make sure they get thru
-            add_imu(i)
-        console.print("Add IMU: " + str(i))
-elif int(REBOCAP_COUNT) == 8:
-    for i in [9, 3, 0, 4, 5, 7, 8, 10, 11]:
-        for z in range(3): # slimevr has been missing "add IMU" packets so we just send em 3 times to make sure they get thru
-            add_imu(i)
-        console.print("Add IMU: " + str(i))
-elif int(REBOCAP_COUNT) == 10:
-    for i in [9, 3, 0, 1, 2, 4, 5, 7, 8, 10, 11]:
-        for z in range(3): # slimevr has been missing "add IMU" packets so we just send em 3 times to make sure they get thru
-            add_imu(i)
-        console.print("Add IMU: " + str(i))
-elif int(REBOCAP_COUNT) == 12:
-    for i in [9, 0, 1, 2, 4, 5, 7, 8, 10, 11, 18, 19]:
-        for z in range(3): # slimevr has been missing "add IMU" packets so we just send em 3 times to make sure they get thru
-            add_imu(i)
-        console.print("Add IMU: " + str(i))
-elif int(REBOCAP_COUNT) == 15:
-    for i in [9, 0, 1, 2, 4, 5, 7, 8, 10, 11, 18, 19, 22, 23 ,15]:
-        for z in range(3): # slimevr has been missing "add IMU" packets so we just send em 3 times to make sure they get thru
-            add_imu(i)
-        console.print("Add IMU: " + str(i))
+if int(REBOCAP_COUNT) in (6, 8, 10, 12, 15):
+    imus = CONFIG['imus'][str(REBOCAP_COUNT)]
+    add_imus(imus)
+    console.print("Add IMUs: " + str(imus))
 else:
     console.print("目前只支持 6 / 8 / 10 / 12 / 15 点哦！")
     exit()
@@ -184,5 +188,9 @@ time.sleep(.5)
 ALL_CONNECTED = True
 
 console.print("已开启追踪！如果想要停止 ReboSlime, 多按几次 Ctrl-C 即可。")
-time.sleep(1000)
-sdk.close()
+
+try:
+    # TODO: 优雅地等待
+    time.sleep(1000000)
+except KeyboardInterrupt:
+    sdk.close()
