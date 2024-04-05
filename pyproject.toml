@@ -9,6 +9,7 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "3.10.10"
 rich = "^13.7.1"
+pyinstaller = "^6.5.0"
 
 
 [build-system]
