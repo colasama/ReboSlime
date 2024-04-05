@@ -19,7 +19,8 @@ ZERO_QUAT = [1, 0, 0, 0]
 ALL_CONNECTED = False
 PACKET_COUNTER = 0
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-sdk = rebocap_ws_sdk.RebocapWsSdk(rebocap_ws_sdk.CoordinateType.UECoordinate)
+sdk = None
+global_quats = []
 
 # 姿态数据回调
 
@@ -27,23 +28,28 @@ sdk = rebocap_ws_sdk.RebocapWsSdk(rebocap_ws_sdk.CoordinateType.UECoordinate)
 def pose_msg_callback(self: rebocap_ws_sdk.RebocapWsSdk, tran: list, pose24: list, static_index: int, ts: float):
     for i in range(24):
         if i in CONFIG["imus"][str(REBOCAP_COUNT)]:
-            update_imu_quat(i, - pose24[i][0], pose24[i]
-                            [1], - pose24[i][2], pose24[i][3])
-            if i == 10:
-                console.log(rebocap_ws_sdk.REBOCAP_JOINT_NAMES[i], ["%.5f" % num for num in pose24[i]])
+            update_imu_quat(i, pose24[i][0], - pose24[i][1],
+                            pose24[i][2], pose24[i][3])
+            # if i == 10:
+            #     console.log(rebocap_ws_sdk.REBOCAP_JOINT_NAMES[i], ["%.5f" % num for num in pose24[i]])
             # console.log(rebocap_ws_sdk.REBOCAP_JOINT_NAMES[i], ["%.5f" % num for num in pose24[i]])
             # time.sleep(0.1)
 
 
 # 异常断开，这里处理重连或报错
 def exception_close_callback(self: rebocap_ws_sdk.RebocapWsSdk):
-    print("exception_close_callback")
+    global sdk
+    try:
+        sdk.close()
+        init_rebocap_ws()
+    except:
+        print("exception_close_callback")
 
 
 def init_rebocap_ws():
     global sdk
     # 初始化sdk
-    # sdk = rebocap_ws_sdk.RebocapWsSdk(rebocap_ws_sdk.CoordinateType.UECoordinate)
+    sdk = rebocap_ws_sdk.RebocapWsSdk(coordinate_type=rebocap_ws_sdk.CoordinateType.UnityCoordinate, use_global_rotation=True)
     # 设置姿态回调
     sdk.set_pose_msg_callback(pose_msg_callback)
     # 设置异常断开回调

@@ -58,7 +58,7 @@ def raw_sdk_example():
 
     for i in range(10):
         tran, pose24, static_index, tp = sdk.get_last_msg()
-        print(f'trans is:{tran}')
+        print(f'trans is:{pose24}')
         time.sleep(0.1)
     time.sleep(10)
     # 断开连接
