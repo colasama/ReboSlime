@@ -1,7 +1,29 @@
+<!-- markdownlint-disable MD033 MD041 -->
+<p align="center">
+  <img src="./reboslime.ico" style="border-radius: 100px;" width="200" height="200" alt="Reboslime">
+</p>
+
+<div align="center">
+
 # ReboSlime
-> 在 SlimeVR Server 中使用 ReboCap，基于 OSC 协议。
->
-> Use ReboCap in SlimeVR Server based on Open Sound Control protocol.
+
+<!-- prettier-ignore-start -->
+<!-- markdownlint-disable-next-line MD036 -->
+<div>在 SlimeVR Server 中使用 ReboCap</div>
+<div style="margin-bottom: 12px">Use ReboCap in SlimeVR Server</div>
+
+<!-- prettier-ignore-end -->
+
+</div>
+
+<p align="center">
+  <a href="https://raw.githubusercontent.com/colasama/reboslime/master/LICENSE">
+    <img src="https://img.shields.io/github/license/colasama/reboslime" alt="license">
+  </a>
+  <img src="https://img.shields.io/badge/python-3.10.x-blue?logo=python&logoColor=edb641" alt="python">
+</p>
+
+
 
 ## 使用说明
 
