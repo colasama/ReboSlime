@@ -1,7 +1,8 @@
 <!-- markdownlint-disable MD033 MD041 -->
 <p align="center">
-  <img src="./reboslime.ico" style="border-radius: 100px;" width="200" height="200" alt="Reboslime">
+  <img src="./assets/round_reboslime.png" style="border-radius: 100px;" width="200" height="200" alt="ReboSlime">
 </p>
+
 
 <div align="center">
 
@@ -37,6 +38,16 @@
 
 - 本项目使用 `Poetry` 进行依赖管理，请安装 3.10.x 版本的 Python 后运行 `pip install poetry`。
 - 使用 `poetry install` 安装依赖，然后运行 `poetry run python reboslime.py` 即可运行程序。
+
+## 打包相关
+
+- 若要打包本项目为可执行文件，请在安装 `pyinstaller` 后运行以下代码。
+
+  ```bash
+  pyinstaller -F -i .\assets\reboslime.ico reboslime.py
+  ```
+
+- 在打包完成后，将 `config.json` 放进可执行文件同目录下即可。
 
 ## 注意事项
 
